@@ -32,3 +32,10 @@ cd env
 make create-topic
 make deploy-app
 ```
+
+## Trigger a rolling restart on cluster
+
+```
+cd env
+make roll-cluster
+```

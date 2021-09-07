@@ -63,3 +63,6 @@ deploy-app:
 
 stop-app:
 	kubectl delete -f app-values.yml
+
+roll-cluster:
+	kubectl rollout restart statefulset/kafka --namespace $(NAMESPACE)
