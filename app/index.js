@@ -25,7 +25,6 @@ const kafka = new Kafka({
 
 const producer = kafka.producer()
 const topic = 'kafkajs'
-const admin = kafka.admin()
 
 const { CONNECT, DISCONNECT, REQUEST_TIMEOUT, REQUEST_QUEUE_SIZE } = producer.events;
 producer.on(CONNECT, e => console.log(`Producer connected at ${e.timestamp}`));
@@ -54,11 +53,11 @@ function exceptionCallback(result) {
   console.log("send() failed!  " + result);
 }
 
-function addDataToQueue() {
+function enQueueData() {
     if (batch.length < 500) {
         batch.push({value: bigString})
     } else {
-        console.log(`discard event`)
+        console.log(`Queue is too big: discard event`)
     }
 }
 
@@ -69,7 +68,7 @@ function sendData(dataArray) {
         messages: dataArray,
         acks: 1,
       }).then(() => {
-        console.log('data sent', {count: dataArray.length, duration: new Date() - now});
+        //console.log('data sent', {count: dataArray.length, duration: new Date() - now});
         return {
             count: dataArray.length,
         }
@@ -91,7 +90,7 @@ function splitQueue(queue) {
     return tmp
 }
 
-function deQueueBatch() {
+function deQueueAndSend() {
   if  (!lock) {
     lock = true
     const now = new Date();
@@ -106,27 +105,29 @@ function deQueueBatch() {
               console.log(`Error in sending data`)
               return result
           }).then(function(result) {
-              console.log(`Success in sending data`)
+              //console.log(`Success in sending data`)
               return result
           })
     })
   
     Promise.allSettled(promises).then(function(results) {
         lock = false
-        results.forEach((result) => console.log(result))
+        //results.forEach((result) => console.log(result))
+        console.log(`Unlock queue, lock duration=${new Date()- now}`)
     })
   }
 }
 
 (async function main(){
-  await admin.connect()
-  await admin.createTopics({
-    topics: [{ topic }],
-    waitForLeaders: true,
-  })
+
+  //await admin.connect()
+  //await admin.createTopics({
+  //  topics: [{ topic }],
+  //  waitForLeaders: true,
+  //})
   await producer.connect().catch(e => {
     log.error("failed to producer.connect()", e);
   });
-  setInterval(addDataToQueue, 10)
-  setInterval(deQueueBatch, 1000);
+  setInterval(enQueueData, 10)
+  setInterval(deQueueAndSend, 1000);
 })().catch(e => {throw e});
