@@ -43,6 +43,7 @@ const payload = new Array(3).fill({value: bigString});
 // const payload = [ { value: bigString} ]
 
 const batch = []
+var lock = false
 
 function successCallback(result) {
   console.log("send() finished ");
@@ -54,7 +55,11 @@ function exceptionCallback(result) {
 }
 
 function addDataToQueue() {
-    batch.push({value: bigString})
+    if (batch.length < 500) {
+        batch.push({value: bigString})
+    } else {
+        console.log(`discard event`)
+    }
 }
 
 function sendData(dataArray) {
@@ -87,26 +92,30 @@ function splitQueue(queue) {
 }
 
 function deQueueBatch() {
-  const now = new Date();
-  const used = process.memoryUsage().heapUsed / 1024 / 1024;
-  console.log(`Memory: ${Math.round(used * 100) / 100} MB`);
-  console.log(`Queue size: ${batch.length}`)
-
-  var batches = splitQueue(batch)
-  var promises = batches.map(function (events) {
-      return sendData(events)
-        .catch(function(result) {
-            console.log(`Error in sending data`)
-            return result
-        }).then(function(result) {
-            console.log(`Success in sending data`)
-            return result
-        })
-  })
-
-  Promise.allSettled(promises).
-  then((results) => results.forEach((result) => console.log(result)));
-
+  if  (!lock) {
+    lock = true
+    const now = new Date();
+    const used = process.memoryUsage().heapUsed / 1024 / 1024;
+    console.log(`Memory: ${Math.round(used * 100) / 100} MB`);
+    console.log(`Queue size: ${batch.length}`)
+  
+    var batches = splitQueue(batch)
+    var promises = batches.map(function (events) {
+        return sendData(events)
+          .catch(function(result) {
+              console.log(`Error in sending data`)
+              return result
+          }).then(function(result) {
+              console.log(`Success in sending data`)
+              return result
+          })
+    })
+  
+    Promise.allSettled(promises).then(function(results) {
+        lock = false
+        results.forEach((result) => console.log(result))
+    })
+  }
 }
 
 (async function main(){
@@ -119,5 +128,5 @@ function deQueueBatch() {
     log.error("failed to producer.connect()", e);
   });
   setInterval(addDataToQueue, 10)
-  setInterval(deQueueBatch, 1000, 1000);
+  setInterval(deQueueBatch, 1000);
 })().catch(e => {throw e});
